@@ -1,0 +1,81 @@
+version: 2
+
+models:
+  - name: stg_listings
+    description: "Staging model for raw housing listings."
+    columns:
+      - name: price
+        description: "Listing price"
+        tests:
+          - not_null
+  
+  - name: stg_economic_indicators
+    description: "Staging model for FRED economic indicators."
+    columns:
+      - name: series_id
+        description: "FRED Series ID"
+        tests:
+          - not_null
+
+  - name: gold_price_stats
+    description: "Gold model aggregating housing prices by state and including latest economic indicators."
+    columns:
+      - name: state
+        description: "US State"
+        tests:
+          - not_null
+          - unique
+
+  - name: gold_city_stats
+    description: "City-level price aggregation for drill-down dashboards."
+    columns:
+      - name: state
+        description: "US State"
+        tests:
+          - not_null
+      - name: city
+        description: "City name"
+        tests:
+          - not_null
+      - name: total_listings
+        description: "Number of listings in the city"
+        tests:
+          - not_null
+
+  - name: gold_property_segments
+    description: "Listings segmented by bedroom count for inventory mix analysis."
+    columns:
+      - name: bedroom_segment
+        description: "Bedroom category label (Studio, 1-Bed, etc.)"
+        tests:
+          - not_null
+          - unique
+      - name: total_listings
+        description: "Number of listings in the segment"
+        tests:
+          - not_null
+
+  - name: gold_affordability
+    description: "State-level affordability scores combining listing prices with mortgage rates."
+    columns:
+      - name: state
+        description: "US State"
+        tests:
+          - not_null
+          - unique
+      - name: affordability_tier
+        description: "Affordability tier ($ to $$$$)"
+        tests:
+          - not_null
+
+  - name: gold_market_overview
+    description: "Single-row national market KPI summary for dashboard header cards."
+    columns:
+      - name: total_listings
+        description: "Total number of listings nationwide"
+        tests:
+          - not_null
+      - name: national_avg_price
+        description: "National average listing price"
+        tests:
+          - not_null
