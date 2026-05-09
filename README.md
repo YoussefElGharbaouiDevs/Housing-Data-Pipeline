@@ -1,78 +1,167 @@
 # End-to-End Housing Data Pipeline
 
-This is a production-like Data Engineering project to process and analyze US housing prices.
+A production-like Data Engineering project designed to process, transform, and analyze US housing market data using a modern ELT architecture.
 
-## Architecture & Technology Stack
-
-- **Ingestion**: Python scripts (Producer/Consumer) processing a local CSV file.
-- **Message Broker**: Apache Kafka & ZooKeeper (handling `housing_raw` topic).
-- **Data Lake (Bronze)**: MinIO (S3-compatible storage) storing raw Parquet files.
-- **Processing Engine**: `dbt-duckdb` reading from MinIO, transforming, and pushing to Postgres.
-- **Data Warehouse (Serving)**: PostgreSQL serving the finalized Gold layer data.
-- **Orchestration**: Apache Airflow managing the DAG execution.
-- **Visualization**: Metabase connected to the PostgreSQL Data Warehouse.
-- **Data Catalog**: `dbt docs` served continuously on a dedicated port.
-- **Infrastructure**: Fully Dockerized via Docker Compose.
+The platform simulates a real-world analytical data stack by integrating distributed ingestion, event streaming, data lake storage, orchestration, transformation, governance, and BI visualization tools.
 
 ---
 
-## Directory Structure
-- `airflow/`: Contains the custom Dockerfile, `requirements.txt`, and DAGs.
-- `data/`: Mount point to place your `housing_data.csv`.
-- `dbt/`: Contains the `dbt` project (`housing_dbt`) including models, tests, and configurations.
-- `ingestion/`: Contains the Python Producer and Consumer scripts.
-- `postgres-init/`: Initialization scripts for creating the required PostgreSQL databases.
+# Project Overview
+
+This project demonstrates how modern Data Engineering systems are built using industry-standard technologies.
+
+The pipeline automates the full lifecycle of housing data:
+
+- ingesting raw CSV data
+- streaming events through Kafka
+- storing raw datasets in a data lake
+- transforming data using dbt
+- loading analytical models into a data warehouse
+- validating data quality
+- generating lineage and documentation
+- visualizing insights through dashboards
+
+The objective is to replicate a production-grade analytics architecture while applying best practices in orchestration, governance, and containerization.
 
 ---
 
-## Setup Instructions
+# Architecture & Technology Stack
 
-### 1. Place the Dataset
-Download your housing CSV dataset from Kaggle and place it in the `data/` directory. **Ensure the file is named `housing_data.csv`**.
+| Layer | Technology | Purpose |
+|---|---|---|
+| Ingestion | Python Producer/Consumer | CSV ingestion & streaming |
+| Message Broker | Apache Kafka + ZooKeeper | Event streaming |
+| Data Lake (Bronze) | MinIO (S3-compatible) | Raw parquet storage |
+| Processing Engine | dbt + DuckDB | Data transformations |
+| Data Warehouse | PostgreSQL | Analytical serving layer |
+| Orchestration | Apache Airflow | DAG scheduling & automation |
+| Visualization | Metabase | BI dashboards |
+| Data Catalog | dbt Docs | Lineage & documentation |
+| Infrastructure | Docker Compose | Containerized environment |
 
-> **Note**: The dbt staging model (`stg_listings.sql`) expects columns such as `id`, `price`, `city`, `state`, `bed`, `bath`, `house_size`. If your CSV columns differ, please adjust the staging model accordingly.
+---
 
-### 2. Start the Infrastructure
-Run the following command from the root of this project:
+# Pipeline Architecture
+
+```text
+                    +----------------------+
+                    |  Housing CSV Dataset |
+                    +----------+-----------+
+                               |
+                               v
+                    +----------------------+
+                    | Kafka Producer       |
+                    +----------+-----------+
+                               |
+                               v
+                    +----------------------+
+                    | Apache Kafka         |
+                    | Topic: housing_raw   |
+                    +----------+-----------+
+                               |
+                               v
+                    +----------------------+
+                    | Kafka Consumer       |
+                    +----------+-----------+
+                               |
+                               v
+                    +----------------------+
+                    | MinIO Data Lake      |
+                    | Bronze Layer         |
+                    +----------+-----------+
+                               |
+                               v
+                    +----------------------+
+                    | dbt + DuckDB         |
+                    | Transformations      |
+                    +----------+-----------+
+                               |
+                               v
+                    +----------------------+
+                    | PostgreSQL Warehouse |
+                    | Gold Layer           |
+                    +----------+-----------+
+                               |
+                +--------------+--------------+
+                |                             |
+                v                             v
+     +-------------------+       +----------------------+
+     | Metabase          |       | dbt Docs & Lineage   |
+     | Dashboards        |       | Data Catalog         |
+     +-------------------+       +----------------------+
+```
+
+---
+
+# Business Understanding
+
+The real estate industry produces massive amounts of heterogeneous data that require scalable and reliable analytical infrastructures.
+
+This project aims to simulate a modern enterprise-grade data platform capable of:
+
+- processing housing market data end-to-end
+- enabling analytical reporting
+- ensuring data quality and governance
+- supporting scalable transformations
+- providing business-ready insights
+
+The architecture reflects modern cloud-native ELT practices widely used in data teams today.
+
+---
+
+# Directory Structure
+
+```text
+.
+├── airflow/
+├── data/
+├── dbt/
+├── ingestion/
+├── postgres-init/
+├── docker-compose.yml
+└── README.md
+```
+
+---
+
+# Setup Instructions
+
+## 1. Clone the Repository
+
+```bash
+git clone https://github.com/YoussefElGharbaouiDevs/Housing-Data-Pipeline.git
+cd Housing-Data-Pipeline
+```
+
+## 2. Place the Dataset
+
+Place your housing dataset inside:
+
+```text
+data/housing_data.csv
+```
+
+## 3. Start the Infrastructure
+
 ```bash
 docker-compose up -d
 ```
-This will start ZooKeeper, Kafka, MinIO, Postgres, Airflow components, and Metabase. Wait a couple of minutes for all services (especially Airflow initialization) to become healthy.
-
-### 3. Access Services
-- **Airflow UI**: `http://localhost:8080` (Username: `admin`, Password: `admin`)
-- **MinIO UI**: `http://localhost:9001` (Username: `minioadmin`, Password: `minioadmin`)
-- **Metabase UI**: `http://localhost:3000`
-- **dbt Docs UI**: `http://localhost:8081` (Data Catalog & Lineage)
-
-### 4. Run the Pipeline
-1. Open the Airflow UI at `http://localhost:8080`.
-2. Locate the `housing_data_pipeline` DAG.
-3. Turn on the toggle switch to enable it.
-4. Trigger the DAG manually by clicking the "Play" button.
-
-### 5. Monitor Execution
-The DAG will execute in this order:
-1. `run_kafka_producer`: Reads the CSV and pushes messages to Kafka.
-2. `run_kafka_consumer`: Consumes Kafka messages and writes to MinIO (`s3://bronze/dataset/`).
-3. `dbt_run`: Uses DuckDB to read from MinIO, transform the data, and write to PostgreSQL.
-4. `dbt_test`: Runs tests on the transformed models to ensure data governance.
-5. `dbt_docs_generate`: Automatically builds the data catalog and lineage map.
-
-### 6. Visualize Data
-1. Open Metabase at `http://localhost:3000`.
-2. Create your admin account (or log in).
-3. Connect your database (if not already prompted):
-   - **Database type**: PostgreSQL
-   - **Name**: Data Warehouse
-   - **Host**: `postgres`
-   - **Port**: `5432`
-   - **Database name**: `datawarehouse`
-   - **Username**: `airflow`
-   - **Password**: `airflow`
-4. A comprehensive "US Housing Market Dashboard" has been automatically generated for you via the API script! You can view it directly by going to `http://localhost:3000/dashboard/2`.
 
 ---
 
-## Further Reading
-For a deep dive into the pipeline's concepts, technologies, and step-by-step data flow, please read the [Architecture Overview](architecture_overview.md) document.
+# Access Services
+
+| Service | URL |
+|---|---|
+| Airflow UI | http://localhost:8080 |
+| MinIO UI | http://localhost:9001 |
+| Metabase | http://localhost:3000 |
+| dbt Docs | http://localhost:8081 |
+
+---
+
+# Author
+
+Youssef EL Gharbaoui
+
+Data Engineering • DataOps • Analytics Engineering • AI
