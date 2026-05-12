@@ -1,11 +1,42 @@
-$token = "c7ec2cad-a357-4a99-98d3-54f98f9a0dcc"
-$headers = @{
-    "Content-Type"    = "application/json"
-    "X-Metabase-Session" = $token
-}
-$dbId = 2
+$MetabaseUrl = "http://localhost:3000"
+$Email       = "youssef.elgharbaoui@emsi-edu.ma"
+$Password    = "airflow1"
 
-# ── Helper: Create a saved question (card) ──
+# ==============================================================
+# AUTH
+# ==============================================================
+function Get-MetabaseToken {
+    param($Email, $Password, $MetabaseUrl)
+    $body = @{ username = $Email; password = $Password } | ConvertTo-Json
+    try {
+        $r = Invoke-RestMethod -Uri "$MetabaseUrl/api/session" -Method POST `
+             -Headers @{ "Content-Type" = "application/json" } -Body $body
+        Write-Host "[AUTH] OK"
+        return $r.id
+    } catch {
+        Write-Error "[AUTH] FAILED: $_"; exit 1
+    }
+}
+
+$token   = Get-MetabaseToken -Email $Email -Password $Password -MetabaseUrl $MetabaseUrl
+$headers = @{ "Content-Type" = "application/json"; "X-Metabase-Session" = $token }
+
+# ==============================================================
+# HELPERS
+# ==============================================================
+function Get-DatabaseId {
+    param($DbName)
+    $r  = Invoke-RestMethod -Uri "$MetabaseUrl/api/database" -Method GET -Headers $headers
+    $db = $r.data | Where-Object { $_.name -eq $DbName }
+    if ($db) {
+        Write-Host "[DB] Found '$DbName' id=$($db.id)"
+        return $db.id
+    }
+    Write-Host "[DB] '$DbName' not found. Available:"
+    $r.data | ForEach-Object { Write-Host "  - $($_.name) (id=$($_.id))" }
+    return $null
+}
+
 function New-Card {
     param($Name, $Display, $Query, $Viz)
     $body = @{
@@ -18,9 +49,18 @@ function New-Card {
         }
         visualization_settings = if ($Viz) { $Viz } else { @{} }
     } | ConvertTo-Json -Depth 10
-    $card = Invoke-RestMethod -Uri "http://localhost:3000/api/card" -Method POST -Headers $headers -Body $body
+    $card = Invoke-RestMethod -Uri "$MetabaseUrl/api/card" -Method POST -Headers $headers -Body $body
     Write-Host "  Created card '$Name' (id=$($card.id))"
     return $card.id
+}
+
+# ==============================================================
+# 1. DATABASE
+# ==============================================================
+$dbId = Get-DatabaseId -DbName "Data Warehouse"
+if (-not $dbId) { 
+    Write-Error "Cannot proceed without database."; 
+    exit 1 
 }
 
 Write-Host "`n=== Creating Saved Questions ===`n"
@@ -137,7 +177,7 @@ $dashBody = @{
     name        = "US Housing Market Dashboard"
     description = "Comprehensive overview of the US housing market including pricing, affordability, property segments, and city-level statistics."
 } | ConvertTo-Json -Depth 5
-$dash = Invoke-RestMethod -Uri "http://localhost:3000/api/dashboard" -Method POST -Headers $headers -Body $dashBody
+$dash = Invoke-RestMethod -Uri "$MetabaseUrl/api/dashboard" -Method POST -Headers $headers -Body $dashBody
 $dashId = $dash.id
 Write-Host "  Created dashboard (id=$dashId)"
 
@@ -176,26 +216,23 @@ $cards = @(
 
 Write-Host "`n=== Adding Cards to Dashboard ===`n"
 
+# Build the complete dashcards array
+$dashcards = @()
 foreach ($c in $cards) {
-    $cardBody = @{
-        cardId = $c.id
-        col    = $c.col
-        row    = $c.row
-        size_x = $c.size_x
-        size_y = $c.size_y
-    } | ConvertTo-Json -Depth 5
-    $result = Invoke-RestMethod -Uri "http://localhost:3000/api/dashboard/$dashId" -Method PUT -Headers $headers -Body (@{
-        dashcards = @(@{
-            id         = -1
-            card_id    = $c.id
-            col        = $c.col
-            row        = $c.row
-            size_x     = $c.size_x
-            size_y     = $c.size_y
-        })
-    } | ConvertTo-Json -Depth 5)
-    Write-Host "  Added card $($c.id) at ($($c.col), $($c.row))"
+    $dashcards += @{
+        id         = -1
+        card_id    = $c.id
+        col        = $c.col
+        row        = $c.row
+        size_x     = $c.size_x
+        size_y     = $c.size_y
+    }
 }
 
+# Send a single PUT request with all cards
+$putBody = @{ dashcards = $dashcards } | ConvertTo-Json -Depth 10
+$result = Invoke-RestMethod -Uri "$MetabaseUrl/api/dashboard/$dashId" -Method PUT -Headers $headers -Body $putBody
+Write-Host "  Successfully added $($dashcards.Count) cards to dashboard"
+
 Write-Host "`n=== Done! ===`n"
-Write-Host "Dashboard URL: http://localhost:3000/dashboard/$dashId"
+Write-Host "Dashboard URL: $MetabaseUrl/dashboard/$dashId"
