@@ -49,7 +49,14 @@ with DAG(
         bash_command='cd /opt/airflow/dbt/housing_dbt && dbt test --profiles-dir . --target dev'
     )
 
-    # 5. Governance: dbt docs
+    # 5. Governance: Great Expectations
+    # Runs advanced data quality rules against the final Postgres Gold tables
+    gx_validate = BashOperator(
+        task_id='gx_validate_gold_data',
+        bash_command='python /opt/airflow/dags/gx_validate.py'
+    )
+
+    # 6. Governance: dbt docs
     # Generates data catalog and lineage documentation
     dbt_docs = BashOperator(
         task_id='dbt_docs_generate',
@@ -57,4 +64,4 @@ with DAG(
     )
 
     # Define DAG dependencies
-    run_producer >> run_consumer >> dbt_run >> dbt_test >> dbt_docs
+    run_producer >> run_consumer >> dbt_run >> dbt_test >> gx_validate >> dbt_docs
