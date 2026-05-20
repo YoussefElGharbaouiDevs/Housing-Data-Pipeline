@@ -21,7 +21,7 @@ def fetch_fred_data(series_id, api_key):
 def main():
     kafka_broker = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'kafka:29092')
     topic_name = 'housing_raw'
-    data_path = '/opt/airflow/data/realtor-data-small.csv' ## to be replaced with /opt/airflow/data/realtor-data.csv in production
+    data_path = '/opt/airflow/data/realtor-data.csv' ## to be replaced with /opt/airflow/data/realtor-data.csv in production
     fred_api_key = os.getenv('FRED_API_KEY')
     
     print(f"Connecting to Kafka broker at {kafka_broker}")
